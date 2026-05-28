@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <!-- Nivel: Educación Inicial -->
+    <record id="nivel_inicial" model="op.course">
+        <field name="name">Educación Inicial</field>
+        <field name="code">INICIAL</field>
+    </record>
+
+    <!-- Nivel: Educación Primaria -->
+    <record id="nivel_primaria" model="op.course">
+        <field name="name">Educación Primaria</field>
+        <field name="code">PRIMARIA</field>
+    </record>
+
+    <!-- Nivel: Educación Secundaria -->
+    <record id="nivel_secundaria" model="op.course">
+        <field name="name">Educación Secundaria</field>
+        <field name="code">SECUNDARIA</field>
+    </record>
+
+</odoo>

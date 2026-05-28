@@ -1,0 +1,2 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_sciback_school_config_user,sciback.school.config user,model_sciback_school_config,base.group_user,1,1,1,1

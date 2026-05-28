@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Hereda la vista de factura para añadir campos y botones SUNAT -->
+    <record id="view_account_move_sunat_nubefact_form" model="ir.ui.view">
+        <field name="name">account.move.sunat.nubefact.form</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+
+            <!-- Statusbar de estado SUNAT junto al statusbar principal -->
+            <xpath expr="//header/field[@name='state']" position="after">
+                <field name="sunat_state"
+                       widget="statusbar"
+                       statusbar_visible="draft,sending,accepted,rejected,observed"
+                       string="SUNAT"/>
+            </xpath>
+
+            <!-- Botones de acción SUNAT en el header -->
+            <xpath expr="//header/button[@name='action_post']" position="after">
+                <!-- Botón principal: Enviar a SUNAT -->
+                <button name="action_send_to_sunat"
+                        string="Enviar a SUNAT"
+                        type="object"
+                        class="btn-primary"
+                        invisible="state != 'posted' or sunat_state not in ('draft', 'rejected')"
+                        confirm="¿Confirma el envío de este comprobante a SUNAT vía NubeFact?"/>
+
+                <!-- Botón de reenvío para rechazados -->
+                <button name="action_send_to_sunat"
+                        string="Reenviar a SUNAT"
+                        type="object"
+                        class="btn-warning"
+                        invisible="sunat_state != 'rejected'"
+                        confirm="¿Desea reenviar este comprobante a SUNAT?"/>
+            </xpath>
+
+            <!-- Serie y número en el header de la factura -->
+            <xpath expr="//field[@name='name']" position="after">
+                <field name="sunat_serie"
+                       string="Serie"
+                       invisible="not sunat_serie"/>
+                <field name="sunat_numero"
+                       string="N°"
+                       invisible="sunat_numero == 0"/>
+            </xpath>
+
+            <!-- Panel de información SUNAT (hash, CDR, error) -->
+            <xpath expr="//page[@name='other_info']" position="after">
+                <page string="SUNAT / NubeFact" name="sunat_tab"
+                      invisible="sunat_state == 'draft'">
+                    <group>
+                        <group string="Datos de respuesta">
+                            <field name="sunat_hash" readonly="1"/>
+                            <field name="sunat_qr" readonly="1" string="QR"/>
+                            <field name="sunat_enlace_pdf" readonly="1" widget="url" string="PDF"/>
+                            <field name="sunat_enlace_xml" readonly="1" widget="url" string="XML"/>
+                        </group>
+                        <group string="Error" invisible="not sunat_error_msg">
+                            <field name="sunat_error_msg"
+                                   nolabel="1"
+                                   readonly="1"
+                                   widget="text"
+                                   style="color: #D32F2F; font-weight: bold;"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+
+        </field>
+    </record>
+
+</odoo>

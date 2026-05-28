@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!-- Diario: Boletas de Venta -->
+        <record id="journal_boletas_venta" model="account.journal">
+            <field name="name">Boletas de Venta</field>
+            <field name="code">BOL</field>
+            <field name="type">sale</field>
+            <field name="l10n_latam_use_documents" eval="True"/>
+            <field name="sequence" eval="10"/>
+        </record>
+
+        <!-- Diario: Facturas de Venta -->
+        <record id="journal_facturas_venta" model="account.journal">
+            <field name="name">Facturas de Venta</field>
+            <field name="code">FAC</field>
+            <field name="type">sale</field>
+            <field name="l10n_latam_use_documents" eval="True"/>
+            <field name="sequence" eval="11"/>
+        </record>
+
+    </data>
+</odoo>

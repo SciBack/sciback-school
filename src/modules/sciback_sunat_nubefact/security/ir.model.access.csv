@@ -1,0 +1,6 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_send_sunat_wizard_user,access_send_sunat_wizard_user,model_send_to_sunat_wizard,base.group_user,1,1,1,1
+access_sunat_serie_admin,access_sunat_serie_admin,model_sunat_serie,sciback_sunat_nubefact.group_sunat_emisor,1,1,1,0
+access_sunat_serie_read,access_sunat_serie_read,model_sunat_serie,base.group_user,1,0,0,0
+access_sunat_log_admin,access_sunat_log_admin,model_sunat_log,sciback_sunat_nubefact.group_sunat_emisor,1,0,0,0
+access_sunat_log_read,access_sunat_log_read,model_sunat_log,base.group_user,1,0,0,0

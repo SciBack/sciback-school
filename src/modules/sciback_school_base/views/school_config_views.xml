@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ─── Form view ──────────────────────────────────────────────────── -->
+    <record id="view_sciback_school_config_form" model="ir.ui.view">
+        <field name="name">sciback.school.config.form</field>
+        <field name="model">sciback.school.config</field>
+        <field name="arch" type="xml">
+            <form string="Configuración del Colegio">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" placeholder="Nombre del colegio"/>
+                        </h1>
+                    </div>
+                    <notebook>
+
+                        <!-- TAB 1: General -->
+                        <page string="General" name="general">
+                            <group>
+                                <group string="Identificación">
+                                    <field name="name"/>
+                                    <field name="ruc"/>
+                                    <field name="codigo_modular"/>
+                                    <field name="anno_lectivo"/>
+                                </group>
+                                <group string="Autoridades">
+                                    <field name="director_id"/>
+                                    <field name="ugel_id"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <!-- TAB 2: Niveles -->
+                        <page string="Niveles Educativos" name="niveles">
+                            <field name="nivel_ids"
+                                   widget="many2many_tags"
+                                   options="{'no_create': True}"/>
+                        </page>
+
+                        <!-- TAB 3: Integraciones -->
+                        <page string="Integraciones" name="integraciones"
+                              groups="base.group_system">
+                            <group string="Facturación Electrónica (NubeFact)">
+                                <field name="nubefact_api_token" password="True"/>
+                                <field name="nubefact_url_token" password="True"/>
+                                <field name="nubefact_modo"/>
+                            </group>
+                            <group string="Pasarela de Pagos (Culqi)">
+                                <field name="culqi_public_key"/>
+                                <field name="culqi_secret_key" password="True"/>
+                            </group>
+                        </page>
+
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ─── Action ─────────────────────────────────────────────────────── -->
+    <record id="action_sciback_school_config" model="ir.actions.act_window">
+        <field name="name">Configuración del Colegio</field>
+        <field name="res_model">sciback.school.config</field>
+        <field name="view_mode">form</field>
+        <!-- Abre directamente el primer registro (singleton UX) -->
+        <field name="context">{'create': True}</field>
+        <field name="target">current</field>
+    </record>
+
+    <!-- ─── Menú ────────────────────────────────────────────────────────── -->
+    <!-- Categoría raíz (sólo visible si existe menú de Configuración de Odoo) -->
+    <menuitem id="menu_sciback_school_root"
+              name="SciBack School"
+              parent="base_setup.action_general_configuration"
+              sequence="100"/>
+
+    <menuitem id="menu_sciback_school_config"
+              name="Configuración del Colegio"
+              parent="sciback_school_base.menu_sciback_school_root"
+              action="sciback_school_base.action_sciback_school_config"
+              sequence="10"/>
+
+</odoo>

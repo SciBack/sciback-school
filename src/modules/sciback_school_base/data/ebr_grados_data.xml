@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- INICIAL                                                             -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <record id="grado_inicial_3" model="op.batch">
+        <field name="name">Aula 3 años</field>
+        <field name="code">INI-3</field>
+        <field name="course_id" ref="sciback_school_base.nivel_inicial"/>
+        <field name="start_date">2025-03-10</field>
+        <field name="end_date">2025-12-19</field>
+    </record>
+
+    <record id="grado_inicial_4" model="op.batch">
+        <field name="name">Aula 4 años</field>
+        <field name="code">INI-4</field>
+        <field name="course_id" ref="sciback_school_base.nivel_inicial"/>
+        <field name="start_date">2025-03-10</field>
+        <field name="end_date">2025-12-19</field>
+    </record>
+
+    <record id="grado_inicial_5" model="op.batch">
+        <field name="name">Aula 5 años</field>
+        <field name="code">INI-5</field>
+        <field name="course_id" ref="sciback_school_base.nivel_inicial"/>
+        <field name="start_date">2025-03-10</field>
+        <field name="end_date">2025-12-19</field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- PRIMARIA                                                            -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <record id="grado_primaria_1" model="op.batch">
+        <field name="name">1° Primaria</field>
+        <field name="code">PRI-1</field>
+        <field name="course_id" ref="sciback_school_base.nivel_primaria"/>
+        <field name="start_date">2025-03-10</field>
+        <field name="end_date">2025-12-19</field>
+    </record>
+
+    <record id="grado_primaria_2" model="op.batch">
+        <field name="name">2° Primaria</field>
+        <field name="code">PRI-2</field>
+        <field name="course_id" ref="sciback_school_base.nivel_primaria"/>
+        <field name="start_date">2025-03-10</field>
+        <field name="end_date">2025-12-19</field>
+    </record>
+
+    <record id="grado_primaria_3" model="op.batch">
+        <field name="name">3° Primaria</field>
+        <field name="code">PRI-3</field>
+        <field name="course_id" ref="sciback_school_base.nivel_primaria"/>
+        <field name="start_date">2025-03-10</field>
+        <field name="end_date">2025-12-19</field>
+    </record>
+
+    <record id="grado_primaria_4" model="op.batch">
+        <field name="name">4° Primaria</field>
+        <field name="code">PRI-4</field>
+        <field name="course_id" ref="sciback_school_base.nivel_primaria"/>
+        <field name="start_date">2025-03-10</field>
+        <field name="end_date">2025-12-19</field>
+    </record>
+
+    <record id="grado_primaria_5" model="op.batch">
+        <field name="name">5° Primaria</field>
+        <field name="code">PRI-5</field>
+        <field name="course_id" ref="sciback_school_base.nivel_primaria"/>
+        <field name="start_date">2025-03-10</field>
+        <field name="end_date">2025-12-19</field>
+    </record>
+
+    <record id="grado_primaria_6" model="op.batch">
+        <field name="name">6° Primaria</field>
+        <field name="code">PRI-6</field>
+        <field name="course_id" ref="sciback_school_base.nivel_primaria"/>
+        <field name="start_date">2025-03-10</field>
+        <field name="end_date">2025-12-19</field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- SECUNDARIA                                                          -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <record id="grado_secundaria_1" model="op.batch">
+        <field name="name">1° Secundaria</field>
+        <field name="code">SEC-1</field>
+        <field name="course_id" ref="sciback_school_base.nivel_secundaria"/>
+        <field name="start_date">2025-03-10</field>
+        <field name="end_date">2025-12-19</field>
+    </record>
+
+    <record id="grado_secundaria_2" model="op.batch">
+        <field name="name">2° Secundaria</field>
+        <field name="code">SEC-2</field>
+        <field name="course_id" ref="sciback_school_base.nivel_secundaria"/>
+        <field name="start_date">2025-03-10</field>
+        <field name="end_date">2025-12-19</field>
+    </record>
+
+    <record id="grado_secundaria_3" model="op.batch">
+        <field name="name">3° Secundaria</field>
+        <field name="code">SEC-3</field>
+        <field name="course_id" ref="sciback_school_base.nivel_secundaria"/>
+        <field name="start_date">2025-03-10</field>
+        <field name="end_date">2025-12-19</field>
+    </record>
+
+    <record id="grado_secundaria_4" model="op.batch">
+        <field name="name">4° Secundaria</field>
+        <field name="code">SEC-4</field>
+        <field name="course_id" ref="sciback_school_base.nivel_secundaria"/>
+        <field name="start_date">2025-03-10</field>
+        <field name="end_date">2025-12-19</field>
+    </record>
+
+    <record id="grado_secundaria_5" model="op.batch">
+        <field name="name">5° Secundaria</field>
+        <field name="code">SEC-5</field>
+        <field name="course_id" ref="sciback_school_base.nivel_secundaria"/>
+        <field name="start_date">2025-03-10</field>
+        <field name="end_date">2025-12-19</field>
+    </record>
+
+</odoo>

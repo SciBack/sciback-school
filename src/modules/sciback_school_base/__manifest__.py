@@ -1,0 +1,28 @@
+{
+    'name': 'SciBack School Base',
+    'version': '17.0.1.0.0',
+    'category': 'Education',
+    'summary': 'Configuración base para colegios EBR peruanos',
+    'author': 'SciBack',
+    'license': 'LGPL-3',
+    'depends': [
+        'openeducat_core',
+        'openeducat_admission',
+        'openeducat_attendance',
+        'openeducat_exam',
+        'openeducat_fees',
+        'openeducat_timetable',
+        'l10n_pe',
+        'queue_job',
+    ],
+    'data': [
+        'security/ir.model.access.csv',
+        'data/ebr_niveles_data.xml',
+        'data/ebr_grados_data.xml',
+        'views/school_config_views.xml',
+    ],
+    'installable': True,
+    'application': False,
+    'auto_install': False,
+    'pre_init_hook': 'pre_init_hook',
+}
