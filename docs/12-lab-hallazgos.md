@@ -6,7 +6,7 @@
 
 - **Máquina:** MacBook M1 ARM64
 - **Runtime:** OrbStack (Docker 29.4.0)
-- **Lab local:** `~/proyectos/labs/sciback-school/`
+- **Lab local:** `~/proyectos/labs/sciback-odoo/`
 
 ### Stack verificado
 
@@ -147,7 +147,7 @@ Ambos se incluirán en la Fase 1 del deploy canónico.
 ## Hallazgos Fase 1 — Estructura académica EBR (2026-05-28)
 
 ### Módulo `sciback_school_base` creado en:
-`~/proyectos/sciback/sciback-school/src/modules/sciback_school_base/`
+`~/proyectos/sciback/sciback-odoo/src/modules/sciback_school_base/`
 
 ### Decisiones de diseño notables
 

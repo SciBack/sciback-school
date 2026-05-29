@@ -43,7 +43,7 @@ Oct 15        Oct 22        Nov 5
 
 | Tarea | Detalle |
 |-------|---------|
-| Crear repo `sciback-school` en GitHub | Público, LGPL |
+| Crear repo `sciback-odoo` en GitHub | Público, LGPL |
 | Crear repo `sciback-ops` en GitHub | Privado, inventario de clientes |
 | Inicializar estructura de carpetas | `src/`, `deploy/`, `docs/` |
 | `docker-compose.yml` dev funcional | Odoo 17 + PostgreSQL 16 + Redis + Nginx |

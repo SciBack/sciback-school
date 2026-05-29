@@ -22,7 +22,7 @@ Validar el producto con Agua Viva como cliente alfa y luego replicarlo a otros c
 
 ## Entregables principales
 
-- Producto canónico desplegable (`sciback-school`)
+- Producto canónico desplegable (`sciback-odoo`)
 - Instancia cliente Agua Viva en producción
 - Documentación operativa completa
 - IaC (Terraform + Ansible) para provisioning < 2 horas

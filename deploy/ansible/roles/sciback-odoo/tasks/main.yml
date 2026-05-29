@@ -1,0 +1,109 @@
+---
+# ============================================================
+# Role: sciback-odoo
+# Instala Docker, despliega Odoo y configura SSL
+# ============================================================
+
+- name: Actualizar apt
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Instalar dependencias base
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+      - unzip
+      - awscli
+      - python3-pip
+    state: present
+
+- name: Agregar GPG key Docker
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: "0644"
+
+- name: Agregar repositorio Docker
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc]
+      https://download.docker.com/linux/ubuntu jammy stable
+    state: present
+
+- name: Instalar Docker Engine
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-compose-plugin
+    state: present
+    update_cache: true
+
+- name: Habilitar y arrancar Docker
+  ansible.builtin.systemd:
+    name: docker
+    enabled: true
+    state: started
+
+- name: Crear directorio de la aplicación
+  ansible.builtin.file:
+    path: "{{ app_dir }}"
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: "0750"
+
+- name: Clonar repositorio sciback-odoo
+  ansible.builtin.git:
+    repo: https://github.com/SciBack/sciback-odoo.git
+    dest: "{{ app_dir }}"
+    version: main
+    update: "{{ action == 'update' }}"
+
+- name: Generar archivo .env desde Secrets Manager
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ app_dir }}/deploy/.env"
+    owner: ubuntu
+    group: ubuntu
+    mode: "0600"
+  no_log: true
+
+- name: Instalar CloudWatch Agent
+  ansible.builtin.apt:
+    deb: https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+
+- name: Levantar contenedores (producción)
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}/deploy"
+    files:
+      - docker-compose.yml
+      - docker-compose.prod.yml
+    state: present
+    pull: always
+  when: action in ['provision', 'update']
+
+- name: Obtener certificado SSL (certbot)
+  ansible.builtin.command:
+    cmd: >
+      docker compose -f {{ app_dir }}/deploy/docker-compose.yml
+      -f {{ app_dir }}/deploy/docker-compose.prod.yml
+      run --rm certbot certonly --webroot
+      --webroot-path /var/www/certbot
+      -d {{ domain }}
+      --email {{ alert_email }}
+      --agree-tos --non-interactive
+  when: action == 'provision'
+  ignore_errors: true
+
+- name: Backup a S3
+  ansible.builtin.command:
+    cmd: >
+      docker compose -f {{ app_dir }}/deploy/docker-compose.yml
+      exec db pg_dump -U odoo sciback_school | gzip |
+      aws s3 cp - s3://{{ s3_adjuntos }}-backups/db-{{ ansible_date_time.iso8601 }}.sql.gz
+  when: action == 'backup'

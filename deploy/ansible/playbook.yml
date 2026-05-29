@@ -1,0 +1,35 @@
+---
+# ============================================================
+# SciBack School — Playbook de provisioning
+# Uso: ansible-playbook playbook.yml -e "client_slug=agua-viva tier=pilot"
+# Acceso: SSM Session Manager (sin SSH directo)
+# ============================================================
+
+- name: Provisionar instancia SciBack School
+  hosts: "{{ client_slug }}"
+  become: true
+  vars:
+    action: provision     # provision | update | backup
+    app_dir: /opt/sciback-odoo
+    docker_compose_version: "2.24.0"
+
+  pre_tasks:
+    - name: Obtener secretos desde AWS Secrets Manager
+      amazon.aws.aws_secret:
+        name: "sciback-odoo/{{ client_slug }}/odoo"
+        region: "{{ aws_region | default('sa-east-1') }}"
+      register: odoo_secrets
+      no_log: true
+
+    - name: Parsear secretos
+      ansible.builtin.set_fact:
+        secrets: "{{ odoo_secrets.secret | from_json }}"
+      no_log: true
+
+  roles:
+    - role: sciback-odoo
+      vars:
+        db_host: "{{ secrets.db_host }}"
+        db_password: "{{ secrets.db_password }}"
+        master_password: "{{ secrets.master_password }}"
+        s3_adjuntos: "{{ secrets.s3_adjuntos }}"

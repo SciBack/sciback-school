@@ -1,0 +1,54 @@
+version: "3.9"
+
+# ============================================================
+# SciBack School — Overlay producción (EC2 cliente)
+# Uso: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Las credenciales vienen de AWS Secrets Manager via env injection (Ansible)
+# ============================================================
+
+services:
+  db:
+    restart: always
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: /sciback-odoo/${CLIENT_SLUG}/db
+        awslogs-region: ${AWS_REGION:-sa-east-1}
+
+  redis:
+    restart: always
+
+  odoo:
+    restart: always
+    ports: []                    # sin exposición directa; solo via nginx
+    environment:
+      WORKERS: "4"
+      MAX_CRON_THREADS: "2"
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: /sciback-odoo/${CLIENT_SLUG}/odoo
+        awslogs-region: ${AWS_REGION:-sa-east-1}
+
+  nginx:
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/odoo.conf:/etc/nginx/conf.d/default.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: /sciback-odoo/${CLIENT_SLUG}/nginx
+        awslogs-region: ${AWS_REGION:-sa-east-1}
+
+  certbot:
+    image: certbot/certbot:latest
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt
+      - /var/www/certbot:/var/www/certbot
+    entrypoint: /bin/sh -c "trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done"
+    restart: always
