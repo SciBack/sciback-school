@@ -145,3 +145,30 @@ Con esos archivos reales se confirma el formato exacto y el conector se construy
 - Instructivo 3.9.0: `siagie.minedu.gob.pe/archivos/guias_instructivo_3.9.0.pdf`
 - Validación de procesamiento de calificaciones: `siagie.minedu.gob.pe/archivos/7_validacion_procesamiento_calificaciones.pdf`
 - RVM 048-2024: `cdn.www.gob.pe/uploads/document/file/6275055/5518274-resolucion_vice_ministerial-00048-2024-m.pdf`
+
+---
+
+## ¿Existe API pública de SIAGIE? — Investigación (2026-05-28)
+
+Pregunta: ¿se puede integrar Odoo↔SIAGIE por API en vez de Excel?
+
+| Vía | Estado (verificado con fuentes oficiales) |
+|---|---|
+| Portal de desarrolladores MINEDU | ❌ No existe (no hay developer/api.minedu.gob.pe) |
+| SIAGIE publicado en PIDE | ❌ En PIDE solo está "Grados y Títulos por DNI", no la data operativa de SIAGIE |
+| RM/RVM que ordene abrir APIs SIAGIE | ❌ Base legal vigente (RM 609/665/712-2018, RVM 025-2019, RM 432-2020) no la mandata |
+| OAuth/SSO MINEDU para terceros | ❌ PASSPORT es login interno, no IdP para apps externas |
+| Datos abiertos individuales | ❌ Solo agregados (ESCALE/datos abiertos); data de menores no se publica |
+| Convenio privado vía PIDE (DS 029-2021-PCM) | 🟡 Legal pero MINEDU debe publicar primero el servicio (no lo ha hecho); proceso de meses/años + Ley 29733 |
+
+**Competencia (qué hacen los ERP escolares peruanos hoy):** ninguno tiene API con SIAGIE.
+- SieWeb (líder): sin integración API documentada.
+- Smiledu: lo llama "Formatos masivos de descarga a SIAGIE" → es Excel.
+- SIGEDU: integra Google/Zoom/SUNAT, NO SIAGIE.
+- El propio MINEDU documenta el flujo como "Uso Básico": descargar plantilla → llenar → subir.
+
+**Conclusión:** a 2026 NO hay vía API formal. El estándar de facto del mercado es Excel bidireccional. El convenio PIDE es el único camino API formal y depende de que MINEDU publique el servicio (vigilar el catálogo PIDE).
+
+**Estado de decisión:** el usuario NO está convencido del enfoque Excel (2026-05-28) y va a investigar por su cuenta vías alternativas antes de construir. Conector EN PAUSA hasta nueva información.
+
+Fuentes: gob.pe/741-plataforma-de-interoperabilidad-del-estado · busquedas.elperuano.pe (DS 029-2021-PCM) · siagie.minedu.gob.pe/baselegal · passport.minedu.gob.pe · sieweb.com.pe · smiledu.com · sigedu.pe
