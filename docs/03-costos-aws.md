@@ -1,136 +1,114 @@
 # Capítulo 03 — Costos e Inversión AWS
 
-> Área de conocimiento PMBOK: Gestión de los Costos del Proyecto  
-> Región AWS producción (clientes): `us-east-2` (Ohio)  
-> Región AWS labs / infra interna SciBack: `us-east-1` (Virginia)  
-> Última revisión: 2026-05-27
+> Área de conocimiento PMBOK: Gestión de los Costos del Proyecto
+> Región AWS producción (clientes): `us-east-2` (Ohio)
+> Región AWS labs / infra interna SciBack: `us-east-1` (Virginia)
+> Última revisión: **2026-05-29** — reescrito al modelo **multi-tenant** (ver memoria `sciback-odoo-multitenant`)
 
 ---
 
-## 1. Arquitectura de costos por cliente
+## 0. Cambio de modelo (2026-05-29)
 
-Cada cliente recibe una instancia **completamente independiente**. No hay recursos compartidos entre clientes (sin multi-tenant). Esto simplifica el modelo de costos: `costo_total = costo_fijo_SciBack + Σ(costo_por_cliente)`.
+> **La versión anterior de este documento asumía una instancia dedicada (EC2+RDS) por
+> cliente.** Eso hacía inviable atender colegios pequeños: el AWS dedicado (~$45-60/mes)
+> deja margen ~0% frente a una tarifa de S/199. El modelo correcto, alineado con
+> `CLAUDE.md` y la memoria `sciback-school-pricing`, es **multi-tenant**.
+
+Validado en el lab el 2026-05-29: varios colegios en **una sola instancia Odoo**, una DB
+por colegio, aislados por subdominio (`dbfilter` + nginx). Detalle técnico en la memoria
+`sciback-odoo-multitenant`.
+
+---
+
+## 1. Dos arquitecturas de hosting
+
+| Arquitectura | Para quién | Recursos AWS |
+|---|---|---|
+| **A — Pod compartido (multi-tenant)** | Colegios Nano / Pequeño / Mediano | 1 EC2 + 1 RDS alojan **N colegios** (1 DB c/u) |
+| **B — Dedicada** | Enterprise (grandes, multi-sede, requisito contractual de aislamiento físico) | 1 EC2 + 1 RDS Multi-AZ por colegio |
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  Cuenta AWS SciBack (us-east-1 Virginia — labs/infra)       │
-│  ├── Route 53 (DNS global)                                  │
-│  ├── ECR (imágenes Docker canónicas)                        │
-│  └── S3 tfstate + backups cross-region                      │
-│                                                             │
-│  Cuenta AWS cliente-A (us-east-2 Ohio — producción)  ← aislada │
-│  ├── VPC dedicada                                           │
-│  ├── EC2 (Odoo + Nginx)                                     │
-│  ├── RDS PostgreSQL                                         │
-│  ├── S3 (adjuntos, backups)                                 │
-│  ├── Elastic IP                                             │
-│  └── Secrets Manager                                        │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  Cuenta AWS SciBack (us-east-1 Virginia — labs/infra)         │
+│  ├── Route 53 (DNS + wildcard *.colegios.sciback.com)         │
+│  ├── ECR (imágenes Docker canónicas)                          │
+│  └── S3 tfstate + backups cross-region                        │
+│                                                               │
+│  Cuenta AWS producción (us-east-2 Ohio)                       │
+│  ├── POD-1 (multi-tenant)  ← 1 EC2 + 1 RDS                    │
+│  │     ├── DB aguaviva     (colegio A)                        │
+│  │     ├── DB sanpablo     (colegio B)                        │
+│  │     └── … hasta ~10-15 colegios pequeños                   │
+│  ├── POD-2 (multi-tenant)  ← se crea al llenarse el POD-1     │
+│  └── EC2 dedicada cliente-Enterprise (aislada)               │
+└──────────────────────────────────────────────────────────────┘
 ```
 
----
-
-## 2. Tiers de dimensionamiento
-
-### Criterios de selección de tier
-
-| Criterio | Pilot | Small | Medium | Large |
-|----------|-------|-------|--------|-------|
-| Estudiantes | < 200 | 200–600 | 600–1 500 | > 1 500 |
-| Docentes/admin | < 15 | 15–40 | 40–100 | > 100 |
-| Transacciones SUNAT/mes | < 200 | 200–800 | 800–3 000 | > 3 000 |
-| Caso típico | Piloto, IIEE pequeña | Colegio medio | Colegio grande | Consorcio / red |
+Aislamiento entre colegios del mismo pod: cada uno tiene **su propia base de datos** y su
+**filestore separado** (Odoo lo gestiona por-DB). Backups por-DB (`pg_dump` por colegio),
+no por instancia.
 
 ---
 
-## 3. Costos mensuales por tier (USD, precios bajo demanda `sa-east-1`)
+## 2. Escalones de tamaño
 
-### 3.1 Tier Pilot — ~USD 55–65/mes
+> Se añade el escalón **Nano (<100 alumnos)** — refleja la realidad del mercado peruano:
+> muchas IIEE privadas tienen menos de 100 estudiantes.
 
-> Caso uso: Escuela Cristiana Agua Viva (cliente alfa), validación de producto.
+| Criterio | **Nano** | **Pequeño** | **Mediano** | **Grande (Enterprise)** |
+|----------|----------|-------------|-------------|--------------------------|
+| Estudiantes | **< 100** | 100 – 300 | 301 – 800 | > 800 |
+| Docentes/admin | < 8 | 8 – 20 | 21 – 50 | > 50 |
+| Usuarios concurrentes pico | < 8 | < 15 | 15 – 40 | > 40 |
+| Transacciones SUNAT/mes | < 120 | 120 – 400 | 400 – 1 500 | > 1 500 |
+| Hosting | Pod compartido | Pod compartido | Pod compartido | Dedicado |
+| Colegios por pod | ~15 | ~10 | ~4 | 1 |
+| RAM efectiva / colegio | ~0.8 GB | ~1.5 GB | ~4 GB | 16 GB |
+| Almacenamiento / colegio | 10 GB | 20 GB | 50 GB | 200 GB |
+
+---
+
+## 3. Costo de un POD compartido (multi-tenant)
+
+Un pod es un servidor que aloja varios colegios. El costo se **reparte** entre los colegios
+que aloja → el costo por colegio baja con la densidad.
+
+### 3.1 POD estándar — `t3.xlarge` (USD, Ohio, bajo demanda)
 
 | Servicio | Especificación | USD/mes |
 |----------|---------------|---------|
-| EC2 `t3.medium` | 2 vCPU / 4 GB RAM, 30 GB gp3 | 30.37 |
-| EBS gp3 | 50 GB adicional (adjuntos Odoo) | 4.00 |
-| RDS PostgreSQL `db.t3.micro` | 1 vCPU / 1 GB RAM, 20 GB gp2, Single-AZ | 12.41 |
-| Elastic IP | IP estática asignada | 3.60 |
-| S3 Standard | 20 GB adjuntos + backups DB | 0.46 |
-| S3 Glacier IR | Backups antiguos (60 GB) | 1.20 |
-| Secrets Manager | 5 secretos × $0.40 | 2.00 |
-| CloudWatch | Métricas básicas + 2 alarmas | 1.00 |
-| Data Transfer OUT | ~10 GB/mes | 0.90 |
-| Route 53 | 1 zona hospedada + queries | 2.00 |
-| **TOTAL estimado** | | **~58–63** |
-
-> Saving: Reserved Instance 1 año (no upfront) `t3.medium` en Ohio reduce EC2 a ~$18/mes → **total ~$45–50/mes**.
-
----
-
-### 3.2 Tier Small — ~USD 90–105/mes
-
-> Caso uso: Colegio privado establecido, 200–600 estudiantes.
-
-| Servicio | Especificación | USD/mes |
-|----------|---------------|---------|
-| EC2 `t3.large` | 2 vCPU / 8 GB RAM, 30 GB gp3 | 48.14 |
-| EBS gp3 | 100 GB adjuntos | 8.00 |
-| RDS PostgreSQL `db.t3.small` | 2 vCPU / 2 GB RAM, 50 GB gp2, Single-AZ | 24.82 |
+| EC2 `t3.xlarge` | 4 vCPU / 16 GB RAM, 30 GB gp3 (Odoo + Nginx, workers compartidos) | 96.29 |
+| EBS gp3 | 200 GB adjuntos (todos los colegios del pod) | 16.00 |
+| RDS PostgreSQL `db.t3.medium` | 2 vCPU / 4 GB, 100 GB gp3, Single-AZ (N bases) | 60.00 |
 | Elastic IP | | 3.60 |
-| S3 Standard | 50 GB | 1.15 |
-| S3 Glacier IR | Backups (150 GB) | 3.00 |
-| Secrets Manager | 8 secretos | 3.20 |
-| CloudWatch | Logs + métricas + 5 alarmas | 3.00 |
-| Data Transfer OUT | ~25 GB/mes | 2.25 |
-| Route 53 | | 2.00 |
-| **TOTAL estimado** | | **~99–108** |
+| S3 Standard + Glacier IR | Adjuntos + backups por-DB | 6.00 |
+| Secrets Manager | ~10 secretos | 4.00 |
+| CloudWatch | Logs + métricas + alarmas del pod | 6.00 |
+| Data Transfer OUT | ~40 GB/mes agregado | 3.60 |
+| Route 53 | Zona + wildcard | 2.00 |
+| **TOTAL pod (on-demand)** | | **~197** |
+| **TOTAL pod (Reserved 1 año)** | EC2 ~$60 + RDS ~$40 | **~135** |
 
-> Saving: Reserved Instance 1 año `t3.large` Ohio → EC2 ~$30/mes → **total ~$76–85/mes**.
+### 3.2 Costo por colegio según densidad y escalón
 
----
+| Escalón | Colegios/pod | Costo AWS/colegio (on-demand) | Costo AWS/colegio (Reserved) |
+|---------|--------------|-------------------------------|------------------------------|
+| **Nano** (<100) | ~15 | **~$13** | **~$9** |
+| **Pequeño** (100–300) | ~10 | **~$20** | **~$14** |
+| **Mediano** (301–800) | ~4 | **~$49** | **~$34** |
 
-### 3.3 Tier Medium — ~USD 230–280/mes
+> El primer colegio de un pod "carga" el costo fijo; el break-even del pod se alcanza al
+> 4º–5º colegio. Mientras el pod no esté lleno, el costo/colegio es mayor (ver §6).
 
-> Caso uso: Colegio grande o con múltiples sedes, 600–1 500 estudiantes.
-
-| Servicio | Especificación | USD/mes |
-|----------|---------------|---------|
-| EC2 `t3.xlarge` | 4 vCPU / 16 GB RAM, 30 GB gp3 | 96.29 |
-| EBS gp3 | 200 GB adjuntos | 16.00 |
-| RDS PostgreSQL `db.t3.medium` | 2 vCPU / 4 GB RAM, 100 GB gp2, **Multi-AZ** | 83.59 |
-| ALB (Application Load Balancer) | Para health checks y failover | 16.43 |
-| Elastic IP | | 3.60 |
-| S3 Standard | 150 GB | 3.45 |
-| S3 Glacier IR | Backups (500 GB) | 10.00 |
-| Secrets Manager | 12 secretos | 4.80 |
-| CloudWatch | Logs completos + dashboards + 10 alarmas | 8.00 |
-| Data Transfer OUT | ~60 GB/mes | 5.40 |
-| Route 53 | | 2.00 |
-| **TOTAL estimado** | | **~250–270** |
-
-> Saving: Reserved 1 año Ohio → EC2 ~$60 + RDS Multi-AZ ~$54 → **total ~$195–215/mes**.
-
----
-
-### 3.4 Tier Large — ~USD 600–900/mes
-
-> Caso uso: Red de colegios, consorcio educativo, > 1 500 estudiantes.
+### 3.3 Enterprise — instancia dedicada (Reserved aprox.)
 
 | Servicio | Especificación | USD/mes |
 |----------|---------------|---------|
-| EC2 `m6i.2xlarge` | 8 vCPU / 32 GB RAM | 280.32 |
-| EBS gp3 | 500 GB | 40.00 |
-| RDS PostgreSQL `db.r6g.large` | 2 vCPU / 16 GB RAM, 200 GB gp3, Multi-AZ | 210.24 |
-| ALB | | 25.00 |
-| ElastiCache Redis `cache.t3.medium` | Para colas Odoo (queue_job) | 38.69 |
-| Elastic IP | | 3.60 |
-| S3 Standard | 500 GB | 11.50 |
-| S3 Glacier IR | Backups (2 TB) | 40.00 |
-| Secrets Manager | 20 secretos | 8.00 |
-| CloudWatch | Completo | 15.00 |
-| Data Transfer OUT | ~150 GB/mes | 17.10 |
-| Route 53 + WAF | | 12.00 |
-| **TOTAL estimado** | | **~700–900** |
+| EC2 `t3.xlarge`/`m6i.xlarge` | dedicado | 60–120 |
+| RDS `db.t3.medium` **Multi-AZ** | aislado, alta disponibilidad | 84 |
+| ALB + ElastiCache (opcional) | failover / colas | 35–55 |
+| S3 + Secrets + CloudWatch + DT | | ~30 |
+| **TOTAL dedicado** | | **~210–290/mes** |
 
 ---
 
@@ -138,19 +116,20 @@ Cada cliente recibe una instancia **completamente independiente**. No hay recurs
 
 | Ítem | Costo estimado (USD) |
 |------|---------------------|
-| Tiempo de provisioning (`make provision`) | $0 — automatizado |
-| Certificado digital SUNAT (si no tiene) | $80–150 (compra con cliente) |
-| Registro en OSE NubeFact (plan anual) | $0 plan básico / $200 plan profesional |
+| Provisioning (alta de DB en pod, automatizado) | $0 |
+| Certificado digital SUNAT (si no tiene) | $80–150 (con cliente) |
+| Registro OSE NubeFact | $0 plan básico / $200 profesional |
 | Dominio institucional (si no tiene) | $12–30/año |
-| Configuración inicial Odoo + datos maestros | 8–16h desarrollo ($400–800 a $50/h) |
-| Capacitación usuarios (incluida en contrato) | Incluida |
-| **Total inversión setup típica** | **USD 480–1 200** |
+| Config inicial + carga datos maestros | 6–12h ($300–600 a $50/h) |
+| Capacitación | Incluida en contrato |
+| **Total setup típico (Nano/Pequeño)** | **USD 300–800** |
+
+> En multi-tenant el provisioning de un colegio nuevo es **$0 marginal de infraestructura**
+> (no se crea EC2/RDS; solo una base de datos en un pod existente).
 
 ---
 
 ## 5. Costos SciBack (infraestructura interna)
-
-Independiente de los clientes — corresponde a la operación de SciBack como empresa.
 
 | Servicio | Especificación | USD/mes |
 |----------|---------------|---------|
@@ -163,70 +142,100 @@ Independiente de los clientes — corresponde a la operación de SciBack como em
 
 ---
 
-## 6. Proyección financiera — modelo de ingresos vs costos AWS
+## 6. Pricing y márgenes (modelo multi-tenant)
 
-### Supuesto: tarifa mensual al cliente
+### 6.1 Tarifa sugerida por escalón
 
-| Tier | Costo AWS/mes (Ohio) | Margen objetivo | **Precio cliente/mes** |
-|------|---------------------|-----------------|----------------------|
-| Pilot | ~$60 | 3× | **$179–249** |
-| Small | ~$100 | 2.5× | **$249–349** |
-| Medium | ~$260 | 2× | **$520–699** |
-| Large | ~$680 | 1.8× | **$999–1 500** |
+| Escalón | Plan | Costo AWS/mes (Reserved, pod lleno) | **Precio cliente/mes** | Margen bruto |
+|---------|------|--------------------------------------|------------------------|--------------|
+| **Nano** (<100) | Esencial Nano | ~$9 (S/34) | **S/129** *(propuesta)* | ~74% |
+| **Pequeño** (100–300) | Esencial | ~$14 (S/53) | **S/199** | ~73% |
+| **Mediano** (301–800) | Profesional | ~$34 (S/128) | **S/599** | ~79% |
+| **Grande** (>800) | Enterprise | ~$250 (S/940) | **S/1 899** | ~50% |
 
-> El margen cubre: AWS + soporte + actualizaciones + operaciones SciBack.
+> ⚠️ **Decisión de negocio pendiente (Alberto):** el escalón **Nano a S/129** es una
+> *propuesta* para captar colegios muy pequeños sin sacrificar margen. Alternativa: mantener
+> **S/199** como precio único de entrada (margen ~90% para Nano). Validar antes de publicar
+> en `sciback.com/colegios`.
 
-### Break-even operativo
+### 6.2 Por qué multi-tenant cambia todo para colegios pequeños
 
-Con tarifas conservadoras:
+| | Modelo viejo (dedicado) | Modelo nuevo (multi-tenant) |
+|---|---|---|
+| AWS por colegio Nano | ~$50/mes | **~$9–13/mes** |
+| Margen a S/199 | ❌ ~0% | ✅ ~75–90% |
+| Provisioning de cliente nuevo | nueva EC2+RDS | **solo una DB** ($0 infra) |
+| Viabilidad de atender <100 alumnos | No rentable | **Rentable** |
 
-| Clientes activos | Ingresos brutos/mes | Costos AWS/mes | Margen bruto/mes |
-|-----------------|--------------------|--------------|--------------------|
-| 1 (Agua Viva) | $250 | $70 | $180 |
-| 3 | $800 | $250 | $550 |
-| 5 | $1 400 | $430 | $970 |
-| 10 | $3 000 | $900 | $2 100 |
-| 20 | $6 000 | $1 900 | $4 100 |
+### 6.3 Curva de llenado de un pod (escalón Pequeño, Reserved)
 
-> Break-even de desarrollo (estimado 200h × $50/h = $10 000): con 3 clientes a $250/mes ≈ **33 meses**. Con precio $399 ≈ **21 meses**. Agregar cliente = $0 marginal en desarrollo.
+El costo fijo del pod (~$135/mes) se diluye conforme entran colegios:
+
+| Colegios en el pod | Costo AWS/colegio | Margen a S/199 (~$53) |
+|--------------------|-------------------|------------------------|
+| 1 | $135 | ❌ negativo |
+| 3 | $45 | ~15% |
+| 5 | $27 | ~49% |
+| 8 | $17 | ~68% |
+| 10 (lleno) | $14 | ~73% |
+
+> **Regla operativa:** un pod nuevo es deficitario hasta el ~3er colegio. Estrategia: no
+> abrir POD-2 hasta que POD-1 tenga ≥8 colegios. Mezclar Nano+Pequeño en el mismo pod
+> acelera el llenado.
 
 ---
 
-## 7. Comparativa vs alternativas
+## 7. Break-even y proyección
 
-| Alternativa | Costo mensual típico | Ventaja SciBack School |
+| Clientes activos | Ingresos brutos/mes (mix S/129–199) | Costos AWS/mes | Margen bruto/mes |
+|-----------------|--------------------------------------|----------------|--------------------|
+| 1 (Agua Viva) | S/199 | ~$135 (1 pod) | ~S/(305) déficit |
+| 5 | ~S/800 | ~$135 (1 pod) | ~S/290 |
+| 10 (pod lleno) | ~S/1 700 | ~$135 | ~S/1 195 |
+| 20 (2 pods) | ~S/3 400 | ~$270 | ~S/2 390 |
+| 40 (3–4 pods) | ~S/6 800 | ~$540 | ~S/4 775 |
+
+> Break-even de desarrollo (~200h × $50/h = $10 000): con 10 colegios en un pod a S/199 ≈
+> **~16 meses**. Cada colegio adicional dentro de un pod existente = **$0 marginal**.
+
+---
+
+## 8. Comparativa vs alternativas
+
+| Alternativa | Costo mensual típico | Ventaja SciBack Edu |
 |-------------|---------------------|----------------------|
-| SIANET (Peru) | $150–400/mes | — |
+| SIANET (Perú) | $150–400/mes | — |
 | Gedux | $200–500/mes | — |
-| Odoo Enterprise self | $310/mes (10 users) + localizaciones | Odoo Enterprise tiene lock-in de licencia |
-| Google Workspace Edu + hojas | $0–4/usuario | Sin facturación SUNAT, sin notas integradas |
-| **SciBack School Pilot** | **$199–299/mes** | SUNAT nativo, CNEB, SIAGIE, soporte en español, datos en Perú |
+| Odoo Enterprise self | $310/mes (10 users) + localizaciones | Lock-in de licencia |
+| Google Workspace Edu + hojas | $0–4/usuario | Sin SUNAT, sin notas integradas |
+| **SciBack Edu Nano** | **S/129–199/mes** | SUNAT nativo, CNEB, SIAGIE, soporte español, datos en Perú, **viable para <100 alumnos** |
 
 ---
 
-## 8. Estrategia de Reserved Instances
+## 9. Estrategia de Reserved Instances
 
-Para clientes con contrato anual (recomendado):
-
-1. Al confirmar contrato anual → comprar Reserved Instance 1 año (no upfront) para EC2 y RDS del cliente.
-2. Ahorro promedio: **35–40%** vs bajo demanda.
-3. Riesgo: si cliente cancela antes de 12 meses, SciBack asume el costo residual → incluir cláusula de penalidad equivalente en contrato.
-
----
-
-## 9. Monitoreo de costos
-
-- **AWS Cost Explorer** con tags `Client`, `Product`, `Tier` en todos los recursos.
-- **Budget alert** por cliente: alerta al 80% y 100% del presupuesto asignado.
-- **Trusted Advisor** activado en cada cuenta para detectar recursos subutilizados.
-- Review mensual: rightsizing si CPU promedio < 20% por 30 días → downgrade de tier.
+1. Comprar Reserved Instance 1 año (no upfront) para **cada pod** (no por cliente) una vez
+   tenga ≥3 colegios estables → ahorro **35–40%**.
+2. El pod es el activo reservado; los colegios entran/salen sin afectar la reserva.
+3. Para Enterprise dedicado: Reserved al confirmar contrato anual + cláusula de penalidad
+   por cancelación temprana (SciBack asume el residual).
 
 ---
 
-## 10. Notas de precios
+## 10. Monitoreo de costos
 
-- Precios en USD, región `us-east-2` (Ohio — producción), mayo 2026.
-- Tipo de cambio referencial: S/3.75 por USD.
-- Los precios AWS varían; validar con [AWS Pricing Calculator](https://calculator.aws/pricing/2/home) antes de cotizar a cliente.
-- Data transfer entre AZs dentro de `us-east-2` (Ohio): $0.01/GB (relevante para Multi-AZ RDS).
-- Egress a internet: primeros 100 GB/mes gratis desde EC2, luego $0.09/GB (Ohio, más barato que São Paulo $0.114/GB).
+- **AWS Cost Explorer** con tags `Pod`, `Product`, `Tier`. (El tag `Client` ya no aplica a
+  recursos compartidos; se contabiliza a nivel de pod.)
+- **Costeo por colegio**: derivado (costo del pod ÷ nº de colegios activos), no por recurso AWS.
+- **Budget alert por pod**: alerta al 80% / 100%.
+- Review mensual: si un pod supera ~85% de CPU/RAM sostenido → mover colegios a POD nuevo o
+  promover el más grande a Enterprise dedicado.
+
+---
+
+## 11. Notas de precios
+
+- Precios USD, región `us-east-2` (Ohio), mayo 2026. Tipo de cambio referencial: **S/3.75/USD**.
+- Validar con [AWS Pricing Calculator](https://calculator.aws/pricing/2/home) antes de cotizar.
+- Densidades de colegios/pod son estimaciones a confirmar con load test (Fase 7 del cronograma).
+- Egress a internet: primeros 100 GB/mes gratis desde EC2, luego $0.09/GB (Ohio).

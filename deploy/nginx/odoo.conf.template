@@ -1,0 +1,78 @@
+# ============================================================
+# SciBack Odoo — Nginx multi-tenant (un POD = muchos colegios)
+# Plantilla procesada por la imagen nginx (envsubst) -> solo ${BASE_DOMAIN}
+# se sustituye; las variables nginx ($host, $remote_addr, ...) se preservan.
+# Cada colegio entra por  https://<colegio>.${BASE_DOMAIN}
+# Odoo resuelve la DB por el Host (dbfilter = ^%d$).
+# ============================================================
+
+upstream odoo          { server odoo:8069; }
+upstream odoo_longpoll { server odoo:8072; }
+
+# ── HTTP -> HTTPS (y challenge ACME) ─────────────────────────
+server {
+    listen 80;
+    server_name ~^(?<colegio>.+)\.${BASE_DOMAIN}$ ${BASE_DOMAIN};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# ── HTTPS multi-tenant ───────────────────────────────────────
+server {
+    listen 443 ssl;
+    http2 on;
+    # Captura cualquier subdominio del dominio del pod
+    server_name ~^(?<colegio>.+)\.${BASE_DOMAIN}$;
+
+    # Certificado WILDCARD (*.${BASE_DOMAIN}) — emitido vía DNS-01 (Route 53)
+    ssl_certificate     /etc/letsencrypt/live/${BASE_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${BASE_DOMAIN}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    # Headers de seguridad
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options SAMEORIGIN always;
+
+    proxy_read_timeout 720s;
+    proxy_connect_timeout 720s;
+    proxy_send_timeout 720s;
+    client_max_body_size 200m;
+
+    location /longpolling {
+        proxy_pass http://odoo_longpoll;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        proxy_pass http://odoo;
+        proxy_set_header Host $host;
+        proxy_cache_valid 200 7d;
+        expires 7d;
+        add_header Cache-Control "public, no-transform";
+    }
+
+    location / {
+        proxy_pass http://odoo;
+        proxy_set_header Host $host;          # clave: Odoo resuelve la DB por el Host
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_redirect off;
+    }
+
+    # Bloquear gestor/selector de DB (multi-tenant cerrado)
+    location ~* ^/(web/database|xmlrpc/2/db) {
+        deny all;
+        return 403;
+    }
+}
