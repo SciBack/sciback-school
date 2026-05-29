@@ -146,17 +146,18 @@ que aloja → el costo por colegio baja con la densidad.
 
 ### 6.1 Tarifa sugerida por escalón
 
-| Escalón | Plan | Costo AWS/mes (Reserved, pod lleno) | **Precio cliente/mes** | Margen bruto |
-|---------|------|--------------------------------------|------------------------|--------------|
-| **Nano** (<100) | Esencial Nano | ~$9 (S/34) | **S/129** *(propuesta)* | ~74% |
-| **Pequeño** (100–300) | Esencial | ~$14 (S/53) | **S/199** | ~73% |
-| **Mediano** (301–800) | Profesional | ~$34 (S/128) | **S/599** | ~79% |
-| **Grande** (>800) | Enterprise | ~$250 (S/940) | **S/1 899** | ~50% |
+| Escalón | Plan | Costo AWS/mes (Reserved, pod lleno) | **Precio cliente/mes** | Precio anual (2 meses gratis) | Setup | Margen bruto |
+|---------|------|--------------------------------------|------------------------|-------------------------------|-------|--------------|
+| **Nano** (<100) | Esencial Nano | ~$9 (S/45) | **S/149** | S/1 490 | S/249 | ~70% |
+| **Pequeño** (100–300) | Esencial | ~$14 (S/53) | **S/199** | S/1 990 | S/499 | ~73% |
+| **Mediano** (301–800) | Profesional | ~$34 (S/128) | **S/599** | S/5 990 | S/1 499 | ~79% |
+| **Grande** (>800) | Enterprise | ~$250 (S/940) | **S/1 899** | S/18 990 | S/4 999 | ~50% |
 
-> ⚠️ **Decisión de negocio pendiente (Alberto):** el escalón **Nano a S/129** es una
-> *propuesta* para captar colegios muy pequeños sin sacrificar margen. Alternativa: mantener
-> **S/199** como precio único de entrada (margen ~90% para Nano). Validar antes de publicar
-> en `sciback.com/colegios`.
+> ✅ **Precio Nano confirmado 2026-05-29: S/149/mes** (setup S/249, anual con 2 meses gratis).
+> El salto Nano→Esencial es pequeño (×1.33) porque solo cambia el límite de alumnos, no las
+> funciones; los saltos Esencial→Profesional (×3) y Profesional→Enterprise (×3.2) sí pagan
+> capacidades nuevas. El margen neto del Nano (~30%, restando soporte) se sostiene **solo con
+> soporte self-service/email**; por eso no se bajó a S/129.
 
 ### 6.2 Por qué multi-tenant cambia todo para colegios pequeños
 
