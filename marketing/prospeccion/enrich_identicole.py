@@ -10,15 +10,17 @@ SE INCLUYEN los que empiezan en 0). Resume: salta codigo_local ya en el CSV.
 Salida: out/identicole_enrich.csv (headers = propiedades HubSpot, listo para upsert)
 Uso:    .venv/bin/python enrich_identicole.py
 """
-import csv, os, re, time, sys
+import csv, os, re, time, sys, threading
 import urllib.request
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dbfread import DBF
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 DBF_PATH = os.path.join(BASE, "data", "Padron_web.dbf")
 OUT = os.path.join(BASE, "out", "identicole_enrich.csv")
-DELAY = 1.2
+WORKERS = 5          # hilos concurrentes (ritmo ~5 req/s, respetuoso con MINEDU)
+DELAY = 0.2          # pequeña pausa por request dentro de cada hilo
 UA = {"User-Agent": "Mozilla/5.0 (compatible; SciBack-prospeccion/1.0)"}
 # niveles escolares (colegios): Inicial/Primaria/Secundaria/EBA/EBE. Excluye L,T,K,S,P,M.
 ESCOLAR = ("A", "B", "C", "D", "E", "F", "G")
@@ -70,49 +72,61 @@ def colegios_por_local():
 COLS = ["codigo_local", "phone", "email_ie", "director_ie",
         "num_alumnos", "num_docentes", "pension_mensual", "cuota_matricula", "plan_sugerido"]
 
+def procesa(cl, codigos):
+    """Devuelve el rec enriquecido para un local (o None si sin datos)."""
+    rec = {c: "" for c in COLS}
+    rec["codigo_local"] = cl
+    for cod in codigos[:3]:
+        html = fetch(cod); time.sleep(DELAY)
+        if len(html) < 60000:
+            continue
+        tel = campo(html, "Teléfono")
+        email = campo(html, "Correo electrónico")
+        director = campo(html, "Nombre del director")
+        alum = num(campo(html, "Total de estudiantes"))
+        doc = num(campo(html, "Total de docentes"))
+        pen = num(campo(html, "Pensión 2026") or campo(html, "Pensión 2025") or campo(html, "Pensión 2024"))
+        mat = num(campo(html, "Matrícula") or campo(html, "Cuota de Ingreso"))
+        rec["phone"] = rec["phone"] or tel
+        rec["email_ie"] = rec["email_ie"] or (email if "@" in email else "")
+        rec["director_ie"] = rec["director_ie"] or director
+        rec["num_alumnos"] = rec["num_alumnos"] or alum
+        rec["num_docentes"] = rec["num_docentes"] or doc
+        rec["pension_mensual"] = rec["pension_mensual"] or pen
+        rec["cuota_matricula"] = rec["cuota_matricula"] or mat
+        if tel or alum:
+            break
+    rec["plan_sugerido"] = plan_por_alumnos(rec["num_alumnos"])
+    return rec if any(rec[c] for c in COLS[1:-1]) else None
+
 def main():
     done = set()
     if os.path.exists(OUT):
         done = {r["codigo_local"] for r in csv.DictReader(open(OUT, encoding="utf-8"))}
     loc = colegios_por_local()
     pend = [cl for cl in loc if cl not in done]
-    print(f"Colegios (locales): {len(loc):,} | hechos: {len(done):,} | pendientes: {len(pend):,}", flush=True)
+    print(f"Colegios (locales): {len(loc):,} | hechos: {len(done):,} | pendientes: {len(pend):,} | workers: {WORKERS}", flush=True)
     new = not os.path.exists(OUT)
     f = open(OUT, "a", newline="", encoding="utf-8")
     w = csv.DictWriter(f, fieldnames=COLS)
     if new: w.writeheader()
-    hits = 0
-    for i, cl in enumerate(pend, 1):
-        rec = {c: "" for c in COLS}
-        rec["codigo_local"] = cl
-        for cod in loc[cl][:3]:
-            html = fetch(cod); time.sleep(DELAY)
-            if len(html) < 60000:        # home/redirect = sin ficha
-                continue
-            tel = campo(html, "Teléfono")
-            email = campo(html, "Correo electrónico")
-            director = campo(html, "Nombre del director")
-            alum = num(campo(html, "Total de estudiantes"))
-            doc = num(campo(html, "Total de docentes"))
-            pen = num(campo(html, "Pensión 2026") or campo(html, "Pensión 2025") or campo(html, "Pensión 2024"))
-            mat = num(campo(html, "Matrícula") or campo(html, "Cuota de Ingreso"))
-            rec["phone"] = rec["phone"] or tel
-            rec["email_ie"] = rec["email_ie"] or (email if "@" in email else "")
-            rec["director_ie"] = rec["director_ie"] or director
-            rec["num_alumnos"] = rec["num_alumnos"] or alum
-            rec["num_docentes"] = rec["num_docentes"] or doc
-            rec["pension_mensual"] = rec["pension_mensual"] or pen
-            rec["cuota_matricula"] = rec["cuota_matricula"] or mat
-            if tel or alum:              # ficha válida encontrada
-                break
-        rec["plan_sugerido"] = plan_por_alumnos(rec["num_alumnos"])
-        if any(rec[c] for c in COLS[1:-1]):
-            hits += 1
-            w.writerow(rec); f.flush()
-        if i % 50 == 0:
-            print(f"  {i}/{len(pend)} | {hits} con datos", flush=True)
+    lock = threading.Lock()
+    counters = {"i": 0, "hits": 0}
+    with ThreadPoolExecutor(max_workers=WORKERS) as ex:
+        futs = {ex.submit(procesa, cl, loc[cl]): cl for cl in pend}
+        for fut in as_completed(futs):
+            rec = None
+            try: rec = fut.result()
+            except Exception: pass
+            with lock:
+                counters["i"] += 1
+                if rec:
+                    counters["hits"] += 1
+                    w.writerow(rec); f.flush()
+                if counters["i"] % 100 == 0:
+                    print(f"  {counters['i']}/{len(pend)} | {counters['hits']} con datos", flush=True)
     f.close()
-    print(f"FIN. {hits} colegios enriquecidos -> {OUT}", flush=True)
+    print(f"FIN. {counters['hits']} colegios enriquecidos -> {OUT}", flush=True)
 
 if __name__ == "__main__":
     main()
