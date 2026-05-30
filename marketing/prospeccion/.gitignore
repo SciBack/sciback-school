@@ -1,0 +1,6 @@
+# Datos crudos y derivados (grandes / regenerables desde la fuente)
+data/
+out/
+.venv/
+*.zip
+*.dbf
